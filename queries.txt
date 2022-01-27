@@ -1,0 +1,80 @@
+/*Query 1 - query used for first insight*/
+SELECT a.title AS film_title, 
+       c.name AS category_name,
+       COUNT(e.rental_id) AS rental_count   
+FROM film a
+JOIN film_category b 
+ON a.film_id = b.film_id
+JOIN category c 
+ON b.category_id = c.category_id
+JOIN inventory d
+ON a.film_id = d.film_id
+JOIN rental e
+ON d.inventory_id = e.inventory_id
+WHERE c.name IN ('Animation', 'Children', 'Classics', 'Comedy', 'Family', 'Music')
+GROUP BY 1,2
+ORDER BY 2,1;
+
+
+/*Query 2 - query used for second insight*/
+SELECT title, 
+       name,
+       rental_duration,
+       t1.standard_quartile
+FROM
+  (SELECT a.title AS title, 
+	  c.name AS name,
+          a.rental_duration,
+NTILE(4) OVER (PARTITION BY c.name ORDER BY a.rental_duration) AS standard_quartile
+FROM film a
+JOIN film_category b 
+ON a.film_id = b.film_id
+JOIN category c 
+ON b.category_id = c.category_id
+WHERE c.name IN ('Animation', 'Children', 'Classics', 'Comedy', 'Family', 'Music')
+GROUP BY 1,2,3)t1
+GROUP BY 1,2,3,4
+ORDER BY 4;
+
+
+/*Query 3 - query used for third insight*/
+SELECT DATE_PART('month', c.rental_date) AS Rental_month,
+       DATE_PART('year', c.rental_date) AS Rental_year,
+       a.store_id AS Store_ID,
+       COUNT(c.rental_id) AS Count_rentals 
+FROM store a
+JOIN staff b 
+ON a.store_id = b.store_id
+JOIN rental c 
+ON b.staff_id = c.staff_id
+GROUP BY 1,2,3
+ORDER BY 4 DESC;
+
+
+/*Query 4 - query used for fourth insight*/
+SELECT  month,
+        year,
+        volumeband_name, 
+        SUM(volumeband_volume) as payment_count,
+        SUM(volumeband_value) as total_payment_value
+FROM
+  (SELECT DATE_PART('month',c.rental_date) AS month,
+   DATE_PART('year',c.rental_date) AS year,
+   CASE WHEN b.amount<=2.99 THEN 'Amount <= 2.99'
+WHEN b.amount BETWEEN 3 AND 5.99 THEN '3 >= Amount <= 5.99'
+WHEN b.amount BETWEEN 6 AND 8.99 THEN '6 >= Amount <= 8.99'
+ELSE 'Amount >= 9'  END AS volumeband_name
+,  CASE WHEN b.amount<=2.99 THEN COUNT(b.amount)
+WHEN b.amount BETWEEN 3 AND 5.99  THEN COUNT(b.amount)
+WHEN b.amount BETWEEN 6 AND 8.99 THEN COUNT(b.amount)
+ELSE COUNT(b.amount) END AS volumeband_volume
+,  CASE WHEN b.amount<=2.99 THEN SUM(b.amount)
+WHEN b.amount BETWEEN 3 AND 5.99  THEN SUM(amount)
+WHEN b.amount BETWEEN 6 AND 8.99 THEN SUM(amount)
+ELSE SUM(b.amount) END AS volumeband_value
+FROM payment b
+JOIN rental c
+ON b.rental_id = c.rental_id
+GROUP BY month,year,b.amount) t1
+GROUP BY 1,2,3
+ORDER BY 4 DESC;
